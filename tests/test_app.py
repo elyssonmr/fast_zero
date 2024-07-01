@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from fast_zero.app import html_content
+from fast_zero.schemas import UserPublic, UserSchema
 
 
 def test_should_return_helloworld_json(client):
@@ -36,57 +37,43 @@ def test_should_save_new_user_with_id(client):
     }
 
 
-def test_should_return_users_list(client):
-    users = [
-        {
-            'username': 'Sbroubous',
-            'email': 'sbroubous@transamerica.com',
-            'password': '123456',
-        },
-        {
-            'username': 'Sbroubous2',
-            'email': 'sbroubous@transamerica.com',
-            'password': '123456',
-        },
-    ]
+def test_should_raise_bad_request_same_username(client, user):
+    user_schema = UserSchema.model_validate(user).model_dump()
+    response = client.post('/users/', json=user_schema)
 
-    response_users = []
-    for user in users:
-        response = client.post('/users/', json=user)
-        assert response.status_code == HTTPStatus.CREATED
-        response_users.append(response.json())
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Username already exists'}
 
+
+def test_should_raise_bad_request_same_email(client, user):
+    user_schema = UserSchema.model_validate(user).model_dump()
+    user_schema['username'] = 'new_username'
+    response = client.post('/users/', json=user_schema)
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Email already exists'}
+
+
+def test_should_return_users_list(client, user):
+    user_schema = UserPublic.model_validate(user).model_dump()
     response = client.get('/users/')
 
     assert response.status_code == HTTPStatus.OK
-    get_users = response.json()['users']
-
-    for user in response_users:
-        assert user in get_users
+    assert response.json() == {'users': [user_schema]}
 
 
-def test_should_return_updated_user(client):
-    user = {
-        'username': 'Sbroubous',
-        'email': 'sbroubous@transamerica.com',
-        'password': '123456',
+def test_should_return_updated_user(client, user):
+    user_schema = UserPublic.model_validate(user).model_dump()
+    user_schema['username'] = 'Updated Name'
+    user_request = {
+        'username': user_schema['username'],
+        'email': user.email,
+        'password': user.password,
     }
-    response_post = client.post('/users/', json=user)
-
-    assert response_post.status_code == HTTPStatus.CREATED
-
-    created_id = response_post.json()['id']
-
-    user['username'] = 'Sbroubous2'
-    expected_response = {
-        'id': created_id,
-        'username': user['username'],
-        'email': user['email'],
-    }
-    response_put = client.put(f'/users/{created_id}', json=user)
+    response_put = client.put(f'/users/{user.id}', json=user_request)
 
     assert response_put.status_code == HTTPStatus.OK
-    assert response_put.json() == expected_response
+    assert response_put.json() == user_schema
 
 
 def test_should_raise_not_found(client):
@@ -104,64 +91,35 @@ def test_should_raise_not_found(client):
     assert response.json() == {'detail': 'User not found'}
 
 
-def test_should_return_deleted_user_while_update(client):
-    user = {
-        'username': 'Sbroubous',
-        'email': 'sbroubous@transamerica.com',
-        'password': '123456',
-    }
-    response_post = client.post('/users/', json=user)
+def test_should_return_deleted_user_while_delete(client, user):
+    expected_response = UserPublic.model_validate(user).model_dump()
 
-    assert response_post.status_code == HTTPStatus.CREATED
+    response = client.delete(f'/users/{user.id}')
 
-    created_id = response_post.json()['id']
-    expected_response = {
-        'id': created_id,
-        'username': 'Sbroubous',
-        'email': 'sbroubous@transamerica.com',
-    }
-
-    response_detele = client.delete(f'/users/{created_id}')
-
-    assert response_detele.status_code == HTTPStatus.OK
-    assert response_detele.json() == expected_response
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == expected_response
 
 
 def test_should_return_not_found_while_delete_user(client):
     user_id = 100000000
-    response_detele = client.delete(f'/users/{user_id}')
+    response = client.delete(f'/users/{user_id}')
 
-    assert response_detele.status_code == HTTPStatus.NOT_FOUND
-    assert response_detele.json() == {'detail': 'User not found'}
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'User not found'}
 
 
-def test_should_return_one_user(client):
-    user = {
-        'username': 'Sbroubous',
-        'email': 'sbroubous@transamerica.com',
-        'password': '123456',
-    }
+def test_should_return_one_user(client, user):
+    expected_user = UserPublic.model_validate(user).model_dump()
 
-    response_post = client.post('/users/', json=user)
+    response = client.get(f'/users/{user.id}')
 
-    assert response_post.status_code == HTTPStatus.CREATED
-
-    created_id = response_post.json()['id']
-    expected_response = {
-        'id': created_id,
-        'username': 'Sbroubous',
-        'email': 'sbroubous@transamerica.com',
-    }
-
-    response_get = client.get(f'/users/{created_id}')
-
-    assert response_get.status_code == HTTPStatus.OK
-    assert response_get.json() == expected_response
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == expected_user
 
 
 def test_should_return_not_found_while_get_user(client):
     user_id = 100000000
-    response_detele = client.get(f'/users/{user_id}')
+    response = client.get(f'/users/{user_id}')
 
-    assert response_detele.status_code == HTTPStatus.NOT_FOUND
-    assert response_detele.json() == {'detail': 'User not found'}
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'User not found'}
