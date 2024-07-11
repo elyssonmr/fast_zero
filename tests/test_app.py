@@ -62,7 +62,7 @@ def test_should_return_users_list(client, user):
     assert response.json() == {'users': [user_schema]}
 
 
-def test_should_return_updated_user(client, user):
+def test_should_return_updated_user(client, user, token):
     user_schema = UserPublic.model_validate(user).model_dump()
     user_schema['username'] = 'Updated Name'
     user_request = {
@@ -70,16 +70,21 @@ def test_should_return_updated_user(client, user):
         'email': user.email,
         'password': user.password,
     }
-    response_put = client.put(f'/users/{user.id}', json=user_request)
+    response_put = client.put(
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+        json=user_request,
+    )
 
     assert response_put.status_code == HTTPStatus.OK
     assert response_put.json() == user_schema
 
 
-def test_should_raise_not_found(client):
+def test_should_raise_bad_request(client, user, token):
     user_id = 1000000000
     response = client.put(
         f'/users/{user_id}',
+        headers={'Authorization': f'Bearer {token}'},
         json={
             'username': 'Sbroubous',
             'email': 'sbroubous@transamerica.com',
@@ -87,25 +92,30 @@ def test_should_raise_not_found(client):
         },
     )
 
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found'}
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Not enough permission'}
 
 
-def test_should_return_deleted_user_while_delete(client, user):
+def test_should_return_deleted_user_while_delete(client, user, token):
     expected_response = UserPublic.model_validate(user).model_dump()
 
-    response = client.delete(f'/users/{user.id}')
+    response = client.delete(
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == expected_response
 
 
-def test_should_return_not_found_while_delete_user(client):
+def test_should_return_bad_request_while_delete_user(client, token):
     user_id = 100000000
-    response = client.delete(f'/users/{user_id}')
+    response = client.delete(
+        f'/users/{user_id}', headers={'Authorization': f'Bearer {token}'}
+    )
 
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found'}
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Not enough permission'}
 
 
 def test_should_return_one_user(client, user):
@@ -123,3 +133,60 @@ def test_should_return_not_found_while_get_user(client):
 
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json() == {'detail': 'User not found'}
+
+
+def test_should_get_token(client, user):
+    response = client.post(
+        '/token',
+        data={'username': user.email, 'password': user.clean_password},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    token = response.json()
+    assert token['token_type'] == 'Bearer'
+    assert 'access_token' in token
+
+
+def test_create_access_token_should_return_bad_request(client, user):
+    response = client.post(
+        '/token', data={'username': user.email, 'password': 'wrong_passwd'}
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    token = response.json()
+    assert token['detail'] == 'Incorrect email or password'
+
+
+def test_should_return_unauthorized_no_existing_user(client, invalid_token):
+    response = client.put(
+        '/users/1',
+        headers={'Authorization': f'Bearer {invalid_token}'},
+        json={'fake': 'body'},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()['detail'] == 'Could not validate credentials'
+
+
+def test_should_return_unauthorized_no_valid_field_token(
+    client, no_valid_field_token
+):
+    response = client.put(
+        '/users/1',
+        headers={'Authorization': f'Bearer {no_valid_field_token}'},
+        json={'fake': 'body'},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()['detail'] == 'Could not validate credentials'
+
+
+def test_should_return_unauthorized_malformed_token(client):
+    response = client.put(
+        '/users/1',
+        headers={'Authorization': 'Bearer Sboutbous_token'},
+        json={'fake': 'body'},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()['detail'] == 'Could not validate credentials'
