@@ -33,3 +33,10 @@ def login_for_token(session: T_Session, form_data: T_FormData):
     access_token = security.create_access_token(data)
 
     return Token(access_token=access_token, token_type='Bearer')
+
+
+@router.post('/refresh_token', response_model=Token)
+def refresh_access_token(user: User = Depends(security.get_current_user)):
+    new_access_token = security.create_access_token(data={'sub': user.email})
+
+    return Token(access_token=new_access_token, token_type='bearer')

@@ -64,9 +64,9 @@ def test_should_return_updated_user(client, user, token):
     assert response_put.json() == user_schema
 
 
-def test_should_raise_bad_request(client, user, token):
+def test_should_raise_forbidden(client, other_user, token):
     response = client.put(
-        f'/users/{user.id + 1}',
+        f'/users/{other_user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
             'username': 'Sbroubous',
@@ -91,9 +91,9 @@ def test_should_return_deleted_user_while_delete(client, user, token):
     assert response.json() == expected_response
 
 
-def test_should_return_bad_request_while_delete_user(client, user, token):
+def test_should_return_forbidden_while_delete_user(client, other_user, token):
     response = client.delete(
-        f'/users/{user.id + 1}', headers={'Authorization': f'Bearer {token}'}
+        f'/users/{other_user.id}', headers={'Authorization': f'Bearer {token}'}
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN
