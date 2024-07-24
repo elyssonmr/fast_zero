@@ -2,6 +2,7 @@ from http import HTTPStatus
 
 import factory
 import factory.fuzzy
+from freezegun import freeze_time
 
 from fast_zero.models import Todo, TodoState
 
@@ -17,23 +18,30 @@ class TodoFactory(factory.Factory):
 
 
 def test_should_save_todo(client, token):
-    response = client.post(
-        '/todos/',
-        headers={'Authorization': f'Bearer {token}'},
-        json={
-            'title': 'Test Todo',
-            'description': 'test todo for post test',
-            'state': 'draft',
-        },
-    )
+    with freeze_time('2000-01-01 00:00:00'):
+        response = client.post(
+            '/todos/',
+            headers={'Authorization': f'Bearer {token}'},
+            json={
+                'title': 'Test Todo',
+                'description': 'test todo for post test',
+                'state': 'draft',
+            },
+        )
 
     assert response.status_code == HTTPStatus.CREATED
-    assert response.json() == {
+    resp_todo = response.json()
+    expected_values = {
         'id': 1,
         'title': 'Test Todo',
         'description': 'test todo for post test',
         'state': 'draft',
     }
+    for key, value in expected_values.items():
+        assert resp_todo[key] == value
+
+    assert 'created_at' in resp_todo.keys()
+    assert 'updated_at' in resp_todo.keys()
 
 
 def test_should_return_all_created_todos(session, client, user, token):
