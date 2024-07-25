@@ -1,0 +1,24 @@
+services:
+  fast_zero_database:
+    image: 'postgres:16-alpine'
+    container_name: 'fast_zero_db'
+    ports:
+      - '5432:5432'
+    environment:
+      - 'POSTGRES_USER=fast_zero'
+      - 'POSTGRES_DB=fast_zero'
+      - 'POSTGRES_PASSWORD=fast_zero_passwd'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  fast_zero:
+    image: fast_zero_app
+    build: .
+    ports:
+      - '8000:8000'
+    environment:
+      - DATABASE_URL=postgresql+psycopg://fast_zero:fast_zero_passwd@fast_zero_database:5432/fast_zero
+    entrypoint: ["./entrypoint.sh"]
+    depends_on:
+      - fast_zero_database
+volumes:
+  pgdata:

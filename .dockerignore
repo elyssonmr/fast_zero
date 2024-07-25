@@ -1,0 +1,10 @@
+*.sqlite3
+.pytest_cache
+.ruff_cache
+.vscode
+htmlcov
+tests/*
+.coverage
+.coveragerc
+.python-version
+docker-compose.yml
