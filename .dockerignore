@@ -8,3 +8,5 @@ tests/*
 .coveragerc
 .python-version
 docker-compose.yml
+fly.toml
+.git

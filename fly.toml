@@ -1,0 +1,26 @@
+# fly.toml app configuration file generated for elyssonmr-fast-zero on 2024-07-31T18:05:54-03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'elyssonmr-fast-zero'
+primary_region = 'gru'
+
+[build]
+
+[env]
+  SBROBBLES_VAR = 'Sbroubous'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[deploy]
+  release_command = "poetry run alembic upgrade head"
+
+[[vm]]
+  size = 'shared-cpu-1x'

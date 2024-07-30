@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "fast_zero"}]
 
 [tool.poetry.dependencies]
-python = "3.11.*"
+python = "3.12.*"
 fastapi = "^0.111.0"
 ipython = "^8.25.0"
 sqlalchemy = "^2.0.31"
