@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from fast_zero import security
-from fast_zero.database import get_session
+from fast_zero.database import get_async_session
 from fast_zero.models import Todo, TodoState, User
 from fast_zero.schemas import (
     Message,
@@ -18,13 +18,13 @@ from fast_zero.schemas import (
 
 router = APIRouter(prefix='/todos', tags=['Todos'])
 
-T_Session = Annotated[Session, Depends(get_session)]
-T_CurrentUser = Annotated[User, Depends(security.get_current_user)]
+T_AsyncSession = Annotated[Session, Depends(get_async_session)]
+T_AsyncCurrentUser = Annotated[User, Depends(security.get_current_user_async)]
 
 
 @router.post('/', response_model=TodoPublic, status_code=HTTPStatus.CREATED)
-def create_todo(
-    todo: TodoSchema, session: T_Session, current_user: T_CurrentUser
+async def create_todo(
+    todo: TodoSchema, session: T_AsyncSession, current_user: T_AsyncCurrentUser
 ):
     db_todo = Todo(
         title=todo.title,
@@ -34,16 +34,16 @@ def create_todo(
     )
 
     session.add(db_todo)
-    session.commit()
-    session.refresh(db_todo)
+    await session.commit()
+    await session.refresh(db_todo)
 
     return db_todo
 
 
 @router.get('/', response_model=TodoList)
-def list_todos(  # noqa
-    session: T_Session,
-    current_user: T_CurrentUser,
+async def list_todos(  # noqa
+    session: T_AsyncSession,
+    current_user: T_AsyncCurrentUser,
     title: str | None = None,
     description: str | None = None,
     state: TodoState | None = None,
@@ -61,14 +61,16 @@ def list_todos(  # noqa
     if state:
         query = query.filter(Todo.state == state)
 
-    todos = session.scalars(query.offset(offset).limit(limit)).all()
+    todos = await session.scalars(query.offset(offset).limit(limit))
 
-    return {'todos': todos}
+    return {'todos': todos.all()}
 
 
 @router.delete('/{todo_id}', response_model=Message)
-def delete_todo(todo_id: int, session: T_Session, current_user: T_CurrentUser):
-    todo = session.scalar(
+async def delete_todo(
+    todo_id: int, session: T_AsyncSession, current_user: T_AsyncCurrentUser
+):
+    todo = await session.scalar(
         select(Todo).where(Todo.user_id == current_user.id, Todo.id == todo_id)
     )
 
@@ -78,19 +80,19 @@ def delete_todo(todo_id: int, session: T_Session, current_user: T_CurrentUser):
         )
 
     session.delete(todo)
-    session.commit()
+    await session.commit()
 
     return {'message': 'Task has been deleted successfully'}
 
 
 @router.patch('/{todo_id}', response_model=TodoPublic)
-def patch_todo(
+async def patch_todo(
     todo_id: int,
     todo: TodoUpdate,
-    session: T_Session,
-    current_user: T_CurrentUser,
+    session: T_AsyncSession,
+    current_user: T_AsyncCurrentUser,
 ):
-    db_todo = session.scalar(
+    db_todo = await session.scalar(
         select(Todo).where(Todo.user_id == current_user.id, Todo.id == todo_id)
     )
 
@@ -103,7 +105,7 @@ def patch_todo(
         setattr(db_todo, key, value)
 
     session.add(db_todo)
-    session.commit()
-    session.refresh(db_todo)
+    await session.commit()
+    await session.refresh(db_todo)
 
     return db_todo

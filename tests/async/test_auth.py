@@ -48,7 +48,7 @@ def test_should_return_expired_token_after_time(async_client, async_user):
             '/auth/token',
             data={
                 'username': async_user.email,
-                'password': async_user.clean_password
+                'password': async_user.clean_password,
             },
         )
 
@@ -76,8 +76,8 @@ def test_should_refresh_valid_token(async_client, async_user):
             '/auth/token',
             data={
                 'username': async_user.email,
-                'password': async_user.clean_password
-            }
+                'password': async_user.clean_password,
+            },
         )
 
         assert response.status_code == HTTPStatus.OK
@@ -100,8 +100,8 @@ def test_should_not_refresh_expired_token(async_client, async_user):
             '/auth/token',
             data={
                 'username': async_user.email,
-                'password': async_user.clean_password
-            }
+                'password': async_user.clean_password,
+            },
         )
 
         assert response.status_code == HTTPStatus.OK

@@ -39,7 +39,7 @@ async def login_for_token(session: T_AsyncSession, form_data: T_FormData):
 
 @router.post('/refresh_token', response_model=Token)
 def refresh_access_token(
-    user: User = Depends(security.get_current_user_async)
+    user: User = Depends(security.get_current_user_async),
 ):
     new_access_token = security.create_access_token(data={'sub': user.email})
 
