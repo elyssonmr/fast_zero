@@ -1,8 +1,10 @@
 import factory
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+)
 from testcontainers.postgres import PostgresContainer
 
 from fast_zero import security
@@ -23,21 +25,23 @@ class UserFactory(factory.Factory):
 
 
 @pytest.fixture(scope='session')
-def engine():
+async def engine():
     with PostgresContainer('postgres:16-alpine', driver='psycopg') as postgres:
-        engine = create_engine(postgres.get_connection_url())
-        with engine.begin():
-            yield engine
+        engine = create_async_engine(postgres.get_connection_url())
+        yield engine
 
 
 @pytest.fixture()
-def session(engine):
-    table_registry.metadata.create_all(engine)
+async def session(engine):
+    async with engine.connect() as conn:
+        await conn.run_sync(table_registry.metadata.create_all)
+        await conn.commit()
 
-    with Session(engine) as session:
-        yield session
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            yield session
 
-    table_registry.metadata.drop_all(engine)
+        await conn.run_sync(table_registry.metadata.drop_all)
+        await conn.commit()
 
 
 @pytest.fixture()
@@ -53,12 +57,12 @@ def client(session):
 
 
 @pytest.fixture()
-def user(session):
+async def user(session):
     passwd = 'passwd'
     user = UserFactory(password=security.get_password_hash(passwd))
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
 
     user.clean_password = passwd
 
@@ -66,11 +70,11 @@ def user(session):
 
 
 @pytest.fixture()
-def other_user(session):
+async def other_user(session):
     user = UserFactory()
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
 
     return user
 
@@ -79,7 +83,10 @@ def other_user(session):
 def token(client, user):
     response = client.post(
         '/auth/token',
-        data={'username': user.email, 'password': user.clean_password},
+        data={
+            'username': user.email,
+            'password': user.clean_password,
+        },
     )
 
     return response.json()['access_token']

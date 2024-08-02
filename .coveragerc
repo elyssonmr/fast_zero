@@ -1,2 +1,3 @@
 [run]
 omit = fast_zero/database.py
+concurrency = thread,gevent
