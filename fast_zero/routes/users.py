@@ -6,19 +6,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from fast_zero import security
-from fast_zero.database import get_session
+from fast_zero.database import get_async_session, get_session
 from fast_zero.models import User
 from fast_zero.schemas import UserList, UserPublic, UserSchema
 
 router = APIRouter(prefix='/users', tags=['Users'])
 
 T_Session = Annotated[Session, Depends(get_session)]
+T_AsyncSession = Annotated[Session, Depends(get_async_session)]
 T_CurrentUser = Annotated[User, Depends(security.get_current_user)]
+T_AsyncCurrentUser = Annotated[User, Depends(security.get_current_user_async)]
 
 
 @router.post('/', status_code=HTTPStatus.CREATED, response_model=UserPublic)
-def save_user(session: T_Session, user: UserSchema):
-    db_user = session.scalar(
+async def save_user(session: T_AsyncSession, user: UserSchema):
+    db_user = await session.scalar(
         select(User).where(
             (User.username == user.username) | (User.email == user.email)
         )
@@ -35,17 +37,18 @@ def save_user(session: T_Session, user: UserSchema):
     db_user = User(username=user.username, password=password, email=user.email)
 
     session.add(db_user)
-    session.commit()
-    session.refresh(db_user)
+    await session.commit()
+    await session.refresh(db_user)
+
     return db_user
 
 
 @router.put('/{user_id}', response_model=UserPublic)
-def update_user(
-    session: T_Session,
+async def update_user(
+    session: T_AsyncSession,
     user_id: int,
     user: UserSchema,
-    current_user: T_CurrentUser,
+    current_user: T_AsyncCurrentUser,
 ):
     if user_id != current_user.id:
         raise HTTPException(
@@ -56,16 +59,16 @@ def update_user(
     current_user.email = user.email
     current_user.password = security.get_password_hash(user.password)
     session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
+    await session.commit()
+    await session.refresh(current_user)
 
     return current_user
 
 
 @router.get('/', response_model=UserList)
-def get_users(session: T_Session, skip: int = 0, limit: int = 100):
-    users = session.scalars(select(User).offset(skip).limit(limit)).all()
-    return {'users': users}
+async def get_users(session: T_AsyncSession, skip: int = 0, limit: int = 100):
+    users = await session.scalars(select(User).offset(skip).limit(limit))
+    return {'users': users.all()}
 
 
 @router.get('/{user_id}', response_model=UserPublic)
